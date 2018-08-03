@@ -1,3 +1,9 @@
+python-pbr (1.10.0-1pexip1) pexip; urgency=medium
+
+  * Prepare Pexip packaging
+
+ -- John-Mark Bell <jmb@pexip.com>  Fri, 03 Aug 2018 16:55:51 +0000
+
 python-pbr (1.10.0-1) unstable; urgency=medium
 
   [ Ondřej Nový ]
