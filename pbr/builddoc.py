@@ -1,4 +1,4 @@
-# Copyright 2011 OpenStack LLC.
+# Copyright 2011 OpenStack Foundation
 # Copyright 2012-2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
 #
@@ -17,9 +17,7 @@
 from distutils import log
 import fnmatch
 import os
-import pkg_resources
 import sys
-import warnings
 
 try:
     import cStringIO
@@ -27,9 +25,20 @@ except ImportError:
     import io as cStringIO
 
 try:
-    from sphinx import apidoc
+    import sphinx
+    # NOTE(dhellmann): Newer versions of Sphinx have moved the apidoc
+    # module into sphinx.ext and the API is slightly different (the
+    # function expects sys.argv[1:] instead of sys.argv[:]. So, figure
+    # out where we can import it from and set a flag so we can invoke
+    # it properly. See this change in sphinx for details:
+    # https://github.com/sphinx-doc/sphinx/commit/87630c8ae8bff8c0e23187676e6343d8903003a6
+    try:
+        from sphinx.ext import apidoc
+        apidoc_use_padding = False
+    except ImportError:
+        from sphinx import apidoc
+        apidoc_use_padding = True
     from sphinx import application
-    from sphinx import config
     from sphinx import setup_command
 except Exception as e:
     # NOTE(dhellmann): During the installation of docutils, setuptools
@@ -45,8 +54,12 @@ except Exception as e:
     raise ImportError(str(e))
 from pbr import git
 from pbr import options
+from pbr import version
 
 
+_deprecated_options = ['autodoc_tree_index_modules', 'autodoc_index_modules',
+                       'autodoc_tree_excludes', 'autodoc_exclude_modules']
+_deprecated_envs = ['AUTODOC_TREE_INDEX_MODULES', 'AUTODOC_INDEX_MODULES']
 _rst_template = """%(heading)s
 %(underline)s
 
@@ -66,15 +79,19 @@ def _find_modules(arg, dirname, files):
 
 class LocalBuildDoc(setup_command.BuildDoc):
 
+    builders = ['html']
     command_name = 'build_sphinx'
-    builders = ['html', 'man']
+    sphinx_initialized = False
 
     def _get_source_dir(self):
         option_dict = self.distribution.get_option_dict('build_sphinx')
+        pbr_option_dict = self.distribution.get_option_dict('pbr')
+        _, api_doc_dir = pbr_option_dict.get('api_doc_dir', (None, 'api'))
         if 'source_dir' in option_dict:
-            source_dir = os.path.join(option_dict['source_dir'][1], 'api')
+            source_dir = os.path.join(option_dict['source_dir'][1],
+                                      api_doc_dir)
         else:
-            source_dir = 'doc/source/api'
+            source_dir = 'doc/source/' + api_doc_dir
         if not os.path.exists(source_dir):
             os.makedirs(source_dir)
         return source_dir
@@ -116,7 +133,9 @@ class LocalBuildDoc(setup_command.BuildDoc):
 
     def _sphinx_tree(self):
             source_dir = self._get_source_dir()
-            cmd = ['apidoc', '.', '-H', 'Modules', '-o', source_dir]
+            cmd = ['-H', 'Modules', '-o', source_dir, '.']
+            if apidoc_use_padding:
+                cmd.insert(0, 'apidoc')
             apidoc.main(cmd + self.autodoc_tree_excludes)
 
     def _sphinx_run(self):
@@ -125,26 +144,26 @@ class LocalBuildDoc(setup_command.BuildDoc):
         else:
             status_stream = sys.stdout
         confoverrides = {}
+        if self.project:
+            confoverrides['project'] = self.project
         if self.version:
             confoverrides['version'] = self.version
         if self.release:
             confoverrides['release'] = self.release
         if self.today:
             confoverrides['today'] = self.today
-        sphinx_config = config.Config(self.config_dir, 'conf.py', {}, [])
-        sphinx_ver = pkg_resources.get_distribution("sphinx").version
-        if pkg_resources.parse_version(sphinx_ver) > \
-                pkg_resources.parse_version('1.2.3'):
-            sphinx_config.init_values(warnings.warn)
-        else:
-            sphinx_config.init_values()
-        if self.builder == 'man' and len(sphinx_config.man_pages) == 0:
-            return
+        if self.sphinx_initialized:
+            confoverrides['suppress_warnings'] = [
+                'app.add_directive', 'app.add_role',
+                'app.add_generic_role', 'app.add_node',
+                'image.nonlocal_uri',
+            ]
         app = application.Sphinx(
             self.source_dir, self.config_dir,
             self.builder_target_dir, self.doctree_dir,
             self.builder, confoverrides, status_stream,
-            freshenv=self.fresh_env, warningiserror=False)
+            freshenv=self.fresh_env, warningiserror=self.warning_is_error)
+        self.sphinx_initialized = True
 
         try:
             app.build(force_all=self.all_files)
@@ -165,6 +184,23 @@ class LocalBuildDoc(setup_command.BuildDoc):
 
     def run(self):
         option_dict = self.distribution.get_option_dict('pbr')
+
+        # TODO(stephenfin): Remove this (and the entire file) when 5.0 is
+        # released
+        warn_opts = set(option_dict.keys()).intersection(_deprecated_options)
+        warn_env = list(filter(lambda x: os.getenv(x), _deprecated_envs))
+        if warn_opts or warn_env:
+            msg = ('The autodoc and autodoc_tree features are deprecated in '
+                   '4.2 and will be removed in a future release. You should '
+                   'use the sphinxcontrib-apidoc Sphinx extension instead. '
+                   'Refer to the pbr documentation for more information.')
+            if warn_opts:
+                msg += ' Deprecated options: %s' % list(warn_opts)
+            if warn_env:
+                msg += ' Deprecated environment variables: %s' % warn_env
+
+            log.warn(msg)
+
         if git._git_is_installed():
             git.write_git_changelog(option_dict=option_dict)
             git.generate_authors(option_dict=option_dict)
@@ -185,17 +221,37 @@ class LocalBuildDoc(setup_command.BuildDoc):
                         "autodoc_exclude_modules",
                         [None, ""])[1].split()))
 
+        self.finalize_options()
+
+        is_multibuilder_sphinx = version.SemanticVersion.from_pip_string(
+            sphinx.__version__) >= version.SemanticVersion(1, 6)
+
+        # TODO(stephenfin): Remove support for Sphinx < 1.6 in 4.0
+        if not is_multibuilder_sphinx:
+            log.warn('[pbr] Support for Sphinx < 1.6 will be dropped in '
+                     'pbr 4.0. Upgrade to Sphinx 1.6+')
+
+        # TODO(stephenfin): Remove this at the next MAJOR version bump
+        if self.builders != ['html']:
+            log.warn("[pbr] Sphinx 1.6 added native support for "
+                     "specifying multiple builders in the "
+                     "'[sphinx_build] builder' configuration option, "
+                     "found in 'setup.cfg'. As a result, the "
+                     "'[sphinx_build] builders' option has been "
+                     "deprecated and will be removed in pbr 4.0. Migrate "
+                     "to the 'builder' configuration option.")
+            if is_multibuilder_sphinx:
+                self.builder = self.builders
+
+        if is_multibuilder_sphinx:
+            # Sphinx >= 1.6
+            return setup_command.BuildDoc.run(self)
+
+        # Sphinx < 1.6
         for builder in self.builders:
             self.builder = builder
             self.finalize_options()
-            self.project = self.distribution.get_name()
-            self.version = self.distribution.get_version()
-            self.release = self.distribution.get_version()
-            if options.get_boolean_option(option_dict,
-                                          'warnerrors', 'WARNERRORS'):
-                self._sphinx_run()
-            else:
-                setup_command.BuildDoc.run(self)
+            self._sphinx_run()
 
     def initialize_options(self):
         # Not a new style class, super keyword does not work.
@@ -206,8 +262,11 @@ class LocalBuildDoc(setup_command.BuildDoc):
         self.autodoc_tree_excludes = ['setup.py']
 
     def finalize_options(self):
+        from pbr import util
+
         # Not a new style class, super keyword does not work.
         setup_command.BuildDoc.finalize_options(self)
+
         # Handle builder option from command line - override cfg
         option_dict = self.distribution.get_option_dict('build_sphinx')
         if 'command line' in option_dict.get('builder', [[]])[0]:
@@ -216,15 +275,18 @@ class LocalBuildDoc(setup_command.BuildDoc):
         if not isinstance(self.builders, list) and self.builders:
             self.builders = self.builders.split(',')
 
+        self.project = self.distribution.get_name()
+        self.version = self.distribution.get_version()
+        self.release = self.distribution.get_version()
+
         # NOTE(dstanek): check for autodoc tree exclusion overrides
         # in the setup.cfg
         opt = 'autodoc_tree_excludes'
         option_dict = self.distribution.get_option_dict('pbr')
         if opt in option_dict:
-            self.autodoc_tree_excludes = option_dict[opt][1]
-            self.ensure_string_list(opt)
+            self.autodoc_tree_excludes = util.split_multiline(
+                option_dict[opt][1])
 
-
-class LocalBuildLatex(LocalBuildDoc):
-    builders = ['latex']
-    command_name = 'build_sphinx_latex'
+        # handle Sphinx < 1.5.0
+        if not hasattr(self, 'warning_is_error'):
+            self.warning_is_error = False

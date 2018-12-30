@@ -1,4 +1,4 @@
-# Copyright 2011 OpenStack LLC.
+# Copyright 2011 OpenStack Foundation
 # Copyright 2012-2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
 #
@@ -27,6 +27,7 @@ import email.errors
 import os
 import re
 import sys
+import warnings
 
 import pkg_resources
 import setuptools
@@ -45,6 +46,8 @@ from pbr import testr_command
 from pbr import version
 
 REQUIREMENTS_FILES = ('requirements.txt', 'tools/pip-requires')
+PY_REQUIREMENTS_FILES = [x % sys.version_info[0] for x in (
+    'requirements-py%d.txt', 'tools/pip-requires-py%d')]
 TEST_REQUIREMENTS_FILES = ('test-requirements.txt', 'tools/test-requires')
 
 
@@ -56,9 +59,8 @@ def get_requirements_files():
     # - REQUIREMENTS_FILES with -py2 or -py3 in the name
     #   (e.g. requirements-py3.txt)
     # - REQUIREMENTS_FILES
-    return (list(map(('-py' + str(sys.version_info[0])).join,
-                     map(os.path.splitext, REQUIREMENTS_FILES)))
-            + list(REQUIREMENTS_FILES))
+
+    return PY_REQUIREMENTS_FILES + list(REQUIREMENTS_FILES)
 
 
 def append_text_list(config, key, text_list):
@@ -77,9 +79,20 @@ def _any_existing(file_list):
 
 # Get requirements from the first file that exists
 def get_reqs_from_files(requirements_files):
-    for requirements_file in _any_existing(requirements_files):
+    existing = _any_existing(requirements_files)
+
+    deprecated = [f for f in existing if f in PY_REQUIREMENTS_FILES]
+    if deprecated:
+        warnings.warn('Support for \'-pyN\'-suffixed requirements files is '
+                      'deprecated in pbr 4.0 and will be removed in 5.0. '
+                      'Use environment markers instead. Conflicting files: '
+                      '%r' % deprecated,
+                      DeprecationWarning)
+
+    for requirements_file in existing:
         with open(requirements_file, 'r') as fil:
             return fil.read().split('\n')
+
     return []
 
 
@@ -100,6 +113,10 @@ def parse_requirements(requirements_files=None, strip_markers=False):
     for line in get_reqs_from_files(requirements_files):
         # Ignore comments
         if (not line.strip()) or line.startswith('#'):
+            continue
+
+        # Ignore index URL lines
+        if re.match(r'^\s*(-i|--index-url|--extra-index-url).*', line):
             continue
 
         # Handle nested requirements files such as:
@@ -200,8 +217,14 @@ class TestrTest(testr_command.Testr):
     """Make setup.py test do the right thing."""
 
     command_name = 'test'
+    description = 'DEPRECATED: Run unit tests using testr'
 
     def run(self):
+        warnings.warn('testr integration is deprecated in pbr 4.2 and will '
+                      'be removed in a future release. Please call your test '
+                      'runner directly',
+                      DeprecationWarning)
+
         # Can't use super - base class old-style class
         testr_command.Testr.run(self)
 
@@ -225,6 +248,25 @@ class LocalRPMVersion(setuptools.Command):
         pass
 
 
+class LocalDebVersion(setuptools.Command):
+    __doc__ = """Output the deb *compatible* version string of this package"""
+    description = __doc__
+
+    user_options = []
+    command_name = "deb_version"
+
+    def run(self):
+        log.info("[pbr] Extracting deb version")
+        name = self.distribution.get_name()
+        print(version.VersionInfo(name).semantic_version().debian_string())
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+
 def have_testr():
     return testr_command.have_testr
 
@@ -236,8 +278,14 @@ try:
         """Fallback test runner if testr is a no-go."""
 
         command_name = 'test'
+        description = 'DEPRECATED: Run unit tests using nose'
 
         def run(self):
+            warnings.warn('nose integration in pbr is deprecated. Please use '
+                          'the native nose setuptools configuration or call '
+                          'nose directly',
+                          DeprecationWarning)
+
             # Can't use super - base class old-style class
             commands.nosetests.run(self)
 
@@ -263,12 +311,15 @@ if __name__ == "__main__":
     import wsgiref.simple_server as wss
 
     my_ip = socket.gethostbyname(socket.gethostname())
+
     parser = argparse.ArgumentParser(
         description=%(import_target)s.__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        usage='%%(prog)s [-h] [--port PORT] -- [passed options]')
+        usage='%%(prog)s [-h] [--port PORT] [--host IP] -- [passed options]')
     parser.add_argument('--port', '-p', type=int, default=8000,
                         help='TCP port to listen on')
+    parser.add_argument('--host', '-b', default='',
+                        help='IP to bind the server to')
     parser.add_argument('args',
                         nargs=argparse.REMAINDER,
                         metavar='-- [passed options]',
@@ -282,11 +333,11 @@ if __name__ == "__main__":
         else:
             parser.error("unrecognized arguments: %%s" %% ' '.join(args.args))
     sys.argv[1:] = args.args
-    server = wss.make_server('', args.port, %(invoke_target)s())
+    server = wss.make_server(args.host, args.port, %(invoke_target)s())
 
     print("*" * 80)
     print("STARTING test server %(module_name)s.%(invoke_target)s")
-    url = "http://%%s:%%d/" %% (my_ip, server.server_port)
+    url = "http://%%s:%%d/" %% (server.server_name, server.server_port)
     print("Available at %%s" %% url)
     print("DANGER! For testing only, do not use in production")
     print("*" * 80)
@@ -443,6 +494,15 @@ class LocalManifestMaker(egg_info.manifest_maker):
             self.filelist.process_template_line(template_line)
 
     def add_defaults(self):
+        """Add all the default files to self.filelist:
+
+        Extends the functionality provided by distutils to also included
+        additional sane defaults, such as the ``AUTHORS`` and ``ChangeLog``
+        files generated by *pbr*.
+
+        Warns if (``README`` or ``README.txt``) or ``setup.py`` are missing;
+        everything else is optional.
+        """
         option_dict = self.distribution.get_option_dict('pbr')
 
         sdist.sdist.add_defaults(self)
@@ -506,10 +566,56 @@ class LocalSDist(sdist.sdist):
 
     command_name = 'sdist'
 
+    def checking_reno(self):
+        """Ensure reno is installed and configured.
+
+        We can't run reno-based commands if reno isn't installed/available, and
+        don't want to if the user isn't using it.
+        """
+        if hasattr(self, '_has_reno'):
+            return self._has_reno
+
+        try:
+            # versions of reno witout this module will not have the required
+            # feature, hence the import
+            from reno import setup_command  # noqa
+        except ImportError:
+            log.info('[pbr] reno was not found or is too old. Skipping '
+                     'release notes')
+            self._has_reno = False
+            return False
+
+        conf, output_file, cache_file = setup_command.load_config(
+            self.distribution)
+
+        if not os.path.exists(os.path.join(conf.reporoot, conf.notespath)):
+            log.info('[pbr] reno does not appear to be configured. Skipping '
+                     'release notes')
+            self._has_reno = False
+            return False
+
+        self._files = [output_file, cache_file]
+
+        log.info('[pbr] Generating release notes')
+        self._has_reno = True
+
+        return True
+
+    sub_commands = [('build_reno', checking_reno)] + sdist.sdist.sub_commands
+
     def run(self):
         _from_git(self.distribution)
         # sdist.sdist is an old style class, can't use super()
         sdist.sdist.run(self)
+
+    def make_distribution(self):
+        # This is included in make_distribution because setuptools doesn't use
+        # 'get_file_list'. As such, this is the only hook point that runs after
+        # the commands in 'sub_commands'
+        if self.checking_reno():
+            self.filelist.extend(self._files)
+            self.filelist.sort()
+        sdist.sdist.make_distribution(self)
 
 try:
     from pbr import builddoc
@@ -517,11 +623,9 @@ try:
     # Import the symbols from their new home so the package API stays
     # compatible.
     LocalBuildDoc = builddoc.LocalBuildDoc
-    LocalBuildLatex = builddoc.LocalBuildLatex
 except ImportError:
     _have_sphinx = False
     LocalBuildDoc = None
-    LocalBuildLatex = None
 
 
 def have_sphinx():
@@ -541,10 +645,14 @@ def _get_increment_kwargs(git_dir, tag):
         version_spec = tag + "..HEAD"
     else:
         version_spec = "HEAD"
-    changelog = git._run_git_command(['log', version_spec], git_dir)
-    header_len = len('    sem-ver:')
+    # Get the raw body of the commit messages so that we don't have to
+    # parse out any formatting whitespace and to avoid user settings on
+    # git log output affecting out ability to have working sem ver headers.
+    changelog = git._run_git_command(['log', '--pretty=%B', version_spec],
+                                     git_dir)
+    header_len = len('sem-ver:')
     commands = [line[header_len:].strip() for line in changelog.split('\n')
-                if line.lower().startswith('    sem-ver:')]
+                if line.lower().startswith('sem-ver:')]
     symbols = set()
     for command in commands:
         symbols.update([symbol.strip() for symbol in command.split(',')])
@@ -724,7 +832,11 @@ def get_version(package_name, pre_version=None):
         return version
     raise Exception("Versioning for this project requires either an sdist"
                     " tarball, or access to an upstream git repository."
-                    " Are you sure that git is installed?")
+                    " It's also possible that there is a mismatch between"
+                    " the package name in setup.cfg and the argument given"
+                    " to pbr.version.VersionInfo. Project name {name} was"
+                    " given, but was not able to be found.".format(
+                        name=package_name))
 
 
 # This is added because pbr uses pbr to install itself. That means that
