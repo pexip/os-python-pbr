@@ -72,11 +72,10 @@ import distutils.ccompiler
 import pkg_resources
 
 from distutils import log
-from distutils.errors import (DistutilsOptionError, DistutilsModuleError,
-                              DistutilsFileError)
+from distutils import errors
 from setuptools.command.egg_info import manifest_maker
-from setuptools.dist import Distribution
-from setuptools.extension import Extension
+from setuptools import dist as st_dist
+from setuptools import extension
 
 try:
     import ConfigParser as configparser
@@ -102,10 +101,12 @@ D1_D2_SETUP_ARGS = {
     "maintainer": ("metadata",),
     "maintainer_email": ("metadata",),
     "url": ("metadata", "home_page"),
+    "project_urls": ("metadata",),
     "description": ("metadata", "summary"),
     "keywords": ("metadata",),
     "long_description": ("metadata", "description"),
-    "download-url": ("metadata",),
+    "long_description_content_type": ("metadata", "description_content_type"),
+    "download_url": ("metadata",),
     "classifiers": ("metadata", "classifier"),
     "platforms": ("metadata", "platform"),  # **
     "license": ("metadata",),
@@ -113,6 +114,7 @@ D1_D2_SETUP_ARGS = {
     # broken distutils requires
     "install_requires": ("metadata", "requires_dist"),
     "setup_requires": ("metadata", "setup_requires_dist"),
+    "python_requires": ("metadata",),
     "provides": ("metadata", "provides_dist"),  # **
     "obsoletes": ("metadata", "obsoletes_dist"),  # **
     "package_dir": ("files", 'packages_root'),
@@ -148,6 +150,9 @@ MULTI_FIELDS = ("classifiers",
                 "setup_requires",
                 "tests_require",
                 "cmdclass")
+
+# setup() arguments that can have mapping values in setup.cfg
+MAP_FIELDS = ("project_urls",)
 
 # setup() arguments that contain boolean values
 BOOL_FIELDS = ("use_2to3", "zip_safe", "include_package_data")
@@ -189,29 +194,37 @@ def resolve_name(name):
 
 
 def cfg_to_args(path='setup.cfg', script_args=()):
-    """ Distutils2 to distutils1 compatibility util.
+    """Distutils2 to distutils1 compatibility util.
 
-        This method uses an existing setup.cfg to generate a dictionary of
-        keywords that can be used by distutils.core.setup(kwargs**).
+    This method uses an existing setup.cfg to generate a dictionary of
+    keywords that can be used by distutils.core.setup(kwargs**).
 
-        :param file:
-            The setup.cfg path.
-        :parm script_args:
-            List of commands setup.py was called with.
-        :raises DistutilsFileError:
-            When the setup.cfg file is not found.
-
+    :param path:
+        The setup.cfg path.
+    :param script_args:
+        List of commands setup.py was called with.
+    :raises DistutilsFileError:
+        When the setup.cfg file is not found.
     """
 
     # The method source code really starts here.
-    parser = configparser.SafeConfigParser()
+    if sys.version_info >= (3, 2):
+            parser = configparser.ConfigParser()
+    else:
+            parser = configparser.SafeConfigParser()
     if not os.path.exists(path):
-        raise DistutilsFileError("file '%s' does not exist" %
-                                 os.path.abspath(path))
-    parser.read(path)
+        raise errors.DistutilsFileError("file '%s' does not exist" %
+                                        os.path.abspath(path))
+    try:
+        parser.read(path, encoding='utf-8')
+    except TypeError:
+        # Python 2 doesn't accept the encoding kwarg
+        parser.read(path)
     config = {}
     for section in parser.sections():
-        config[section] = dict(parser.items(section))
+        config[section] = dict()
+        for k, value in parser.items(section):
+            config[section][k.replace('-', '_')] = value
 
     # Run setup_hooks, if configured
     setup_hooks = has_get_option(config, 'global', 'setup_hooks')
@@ -260,8 +273,6 @@ def cfg_to_args(path='setup.cfg', script_args=()):
         entry_points = get_entry_points(config)
         if entry_points:
             kwargs['entry_points'] = entry_points
-
-        wrap_commands(kwargs)
 
         # Handle the [files]/extra_files option
         files_extra_files = has_get_option(config, 'files', 'extra_files')
@@ -320,6 +331,12 @@ def setup_cfg_to_setup_kwargs(config, script_args=()):
             in_cfg_value = split_csv(in_cfg_value)
         if arg in MULTI_FIELDS:
             in_cfg_value = split_multiline(in_cfg_value)
+        elif arg in MAP_FIELDS:
+            in_cfg_map = {}
+            for i in split_multiline(in_cfg_value):
+                k, v = i.split('=')
+                in_cfg_map[k.strip()] = v.strip()
+            in_cfg_value = in_cfg_map
         elif arg in BOOL_FIELDS:
             # Provide some flexibility here...
             if in_cfg_value.lower() in ('true', 't', '1', 'yes', 'y'):
@@ -363,7 +380,7 @@ def setup_cfg_to_setup_kwargs(config, script_args=()):
                         else:
                             prev = data_files[key.strip()] = value.split()
                     elif firstline:
-                        raise DistutilsOptionError(
+                        raise errors.DistutilsOptionError(
                             'malformed package_data first line %r (misses '
                             '"=")' % line)
                     else:
@@ -376,7 +393,7 @@ def setup_cfg_to_setup_kwargs(config, script_args=()):
                 in_cfg_value = data_files
             elif arg == 'cmdclass':
                 cmdclass = {}
-                dist = Distribution()
+                dist = st_dist.Distribution()
                 for cls_name in in_cfg_value:
                     cls = resolve_name(cls_name)
                     cmd = cls(dist)
@@ -399,6 +416,13 @@ def setup_cfg_to_setup_kwargs(config, script_args=()):
     if 'extras' in config:
         requirement_pattern = '(?P<package>[^:]*):?(?P<env_marker>[^#]*?)(?:\s*#.*)?$'
         extras = config['extras']
+        # Add contents of test-requirements, if any, into an extra named
+        # 'test' if one does not already exist.
+        if 'test' not in extras:
+            from pbr import packaging
+            extras['test'] = "\n".join(packaging.parse_requirements(
+                packaging.TEST_REQUIREMENTS_FILES)).replace(';', ':')
+
         for extra in extras:
             extra_requirements = []
             requirements = split_multiline(extras[extra])
@@ -530,8 +554,8 @@ def get_extension_modules(config):
             if ext_args:
                 if 'name' not in ext_args:
                     ext_args['name'] = labels[1]
-                ext_modules.append(Extension(ext_args.pop('name'),
-                                             **ext_args))
+                ext_modules.append(extension.Extension(ext_args.pop('name'),
+                                                       **ext_args))
     return ext_modules
 
 
@@ -549,108 +573,9 @@ def get_entry_points(config):
                 for option, value in config['entry_points'].items())
 
 
-def wrap_commands(kwargs):
-    dist = Distribution()
-
-    # This should suffice to get the same config values and command classes
-    # that the actual Distribution will see (not counting cmdclass, which is
-    # handled below)
-    dist.parse_config_files()
-
-    # Setuptools doesn't patch get_command_list, and as such we do not get
-    # extra commands from entry_points.  As we need to be compatable we deal
-    # with this here.
-    for ep in pkg_resources.iter_entry_points('distutils.commands'):
-        if ep.name not in dist.cmdclass:
-            if hasattr(ep, 'resolve'):
-                cmdclass = ep.resolve()
-            else:
-                # Old setuptools does not have ep.resolve, and load with
-                # arguments is depricated in 11+.  Use resolve, 12+, if we
-                # can, otherwise fall back to load.
-                # Setuptools 11 will throw a deprication warning, as it
-                # uses _load instead of resolve.
-                cmdclass = ep.load(False)
-            dist.cmdclass[ep.name] = cmdclass
-
-    for cmd, _ in dist.get_command_list():
-        hooks = {}
-        for opt, val in dist.get_option_dict(cmd).items():
-            val = val[1]
-            if opt.startswith('pre_hook.') or opt.startswith('post_hook.'):
-                hook_type, alias = opt.split('.', 1)
-                hook_dict = hooks.setdefault(hook_type, {})
-                hook_dict[alias] = val
-        if not hooks:
-            continue
-
-        if 'cmdclass' in kwargs and cmd in kwargs['cmdclass']:
-            cmdclass = kwargs['cmdclass'][cmd]
-        else:
-            cmdclass = dist.get_command_class(cmd)
-
-        new_cmdclass = wrap_command(cmd, cmdclass, hooks)
-        kwargs.setdefault('cmdclass', {})[cmd] = new_cmdclass
-
-
-def wrap_command(cmd, cmdclass, hooks):
-    def run(self, cmdclass=cmdclass):
-        self.run_command_hooks('pre_hook')
-        cmdclass.run(self)
-        self.run_command_hooks('post_hook')
-
-    return type(cmd, (cmdclass, object),
-                {'run': run, 'run_command_hooks': run_command_hooks,
-                 'pre_hook': hooks.get('pre_hook'),
-                 'post_hook': hooks.get('post_hook')})
-
-
-def run_command_hooks(cmd_obj, hook_kind):
-    """Run hooks registered for that command and phase.
-
-    *cmd_obj* is a finalized command object; *hook_kind* is either
-    'pre_hook' or 'post_hook'.
-    """
-
-    if hook_kind not in ('pre_hook', 'post_hook'):
-        raise ValueError('invalid hook kind: %r' % hook_kind)
-
-    hooks = getattr(cmd_obj, hook_kind, None)
-
-    if hooks is None:
-        return
-
-    for hook in hooks.values():
-        if isinstance(hook, str):
-            try:
-                hook_obj = resolve_name(hook)
-            except ImportError:
-                err = sys.exc_info()[1] # For py3k
-                raise DistutilsModuleError('cannot find hook %s: %s' %
-                                           (hook,err))
-        else:
-            hook_obj = hook
-
-        if not hasattr(hook_obj, '__call__'):
-            raise DistutilsOptionError('hook %r is not callable' % hook)
-
-        log.info('running %s %s for command %s',
-                 hook_kind, hook, cmd_obj.get_command_name())
-
-        try :
-            hook_obj(cmd_obj)
-        except:
-            e = sys.exc_info()[1]
-            log.error('hook %s raised exception: %s\n' % (hook, e))
-            log.error(traceback.format_exc())
-            sys.exit(1)
-
-
 def has_get_option(config, section, option):
     if section in config and option in config[section]:
         return config[section][option]
-    elif section in config and option.replace('_', '-') in config[section]:
-        return config[section][option.replace('_', '-')]
     else:
         return False
 
@@ -660,7 +585,7 @@ def split_multiline(value):
 
     value = [element for element in
              (line.strip() for line in value.split('\n'))
-             if element]
+             if element and not element.startswith('#')]
     return value
 
 
@@ -673,21 +598,6 @@ def split_csv(value):
     return value
 
 
-def monkeypatch_method(cls):
-    """A function decorator to monkey-patch a method of the same name on the
-    given class.
-    """
-
-    def wrapper(func):
-        orig = getattr(cls, func.__name__, None)
-        if orig and not hasattr(orig, '_orig'):  # Already patched
-            setattr(func, '_orig', orig)
-            setattr(cls, func.__name__, func)
-        return func
-
-    return wrapper
-
-
 # The following classes are used to hack Distribution.command_options a bit
 class DefaultGetDict(defaultdict):
     """Like defaultdict, but the get() method also sets and returns the default
@@ -698,20 +608,3 @@ class DefaultGetDict(defaultdict):
         if default is None:
             default = self.default_factory()
         return super(DefaultGetDict, self).setdefault(key, default)
-
-
-class IgnoreDict(dict):
-    """A dictionary that ignores any insertions in which the key is a string
-    matching any string in `ignore`.  The ignore list can also contain wildcard
-    patterns using '*'.
-    """
-
-    def __init__(self, ignore):
-        self.__ignore = re.compile(r'(%s)' % ('|'.join(
-                                   [pat.replace('*', '.*')
-                                    for pat in ignore])))
-
-    def __setitem__(self, key, val):
-        if self.__ignore.match(key):
-            return
-        super(IgnoreDict, self).__setitem__(key, val)
