@@ -1,3 +1,9 @@
+python-pbr (4.2.0-5pexip1) pexip; urgency=medium
+
+  * Migrate to Buster
+
+ -- Vincent Sanders <vince@pexip.com>  Sun, 01 Mar 2020 15:38:01 +0000
+
 python-pbr (4.2.0-5) unstable; urgency=medium
 
   [ Mattia Rizzolo ]
