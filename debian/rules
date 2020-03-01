@@ -21,13 +21,11 @@ override_dh_python3:
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	if ! dpkg-vendor --derives-from ubuntu; then \
-		set -e && $(CURDIR)/debian/tests/unit; \
-	fi
+	pkgos-dh_auto_test 'pbr\.tests(?!.*test_packaging\.TestRequirementParsing\.test_requirement_parsing.*)'
 endif
 
 override_dh_sphinxdoc:
 ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
-	sphinx-build -b html doc/source $(CURDIR)/debian/python-pbr-doc/usr/share/doc/python-pbr-doc/html
+	PYTHONPATH=. PYTHON=python3 python3 -m sphinx -b html doc/source $(CURDIR)/debian/python-pbr-doc/usr/share/doc/python-pbr-doc/html
 	dh_sphinxdoc -O--buildsystem=python_distutils
 endif

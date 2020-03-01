@@ -1,4 +1,4 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: pbr
 Upstream-Contact: OpenStack Devel <openstack-dev@lists.openstack.org>
 Source: https://pypi.python.org/pypi/pbr
@@ -54,7 +54,7 @@ Copyright: 2011, OpenStack LLC.
  Zhongyue Luo <zhongyue.nah@intel.com>
 License: Apache-2
 
-Files: doc/source/static/nature.css doc/source/semver.rst
+Files: doc/source/semver.rst
 Copyright: (c) 2007-2011, the Sphinx team
 License: BSD-2-clause
 
