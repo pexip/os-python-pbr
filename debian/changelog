@@ -1,3 +1,9 @@
+python-pbr (4.2.0-5pexip2) pexip; urgency=medium
+
+  * Rebuild in buster environment
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Thu, 16 Jul 2020 04:04:01 +0000
+
 python-pbr (4.2.0-5pexip1) pexip; urgency=medium
 
   * Migrate to Buster
