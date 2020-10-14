@@ -1,3 +1,1 @@
 disable_tests.patch
-fix-wheel.install.py-doesnt-exist-anymore.patch
-wheel_file.zipfile-is-moved-in-recent-wheel.patch

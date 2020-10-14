@@ -1,3 +1,102 @@
+python-pbr (5.5.0-2) unstable; urgency=medium
+
+  * Uploading to unstable.
+  * Add a debian/salsa-ci.yml.
+  * Fixed watch file.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 14 Oct 2020 12:43:07 +0200
+
+python-pbr (5.5.0-1) experimental; urgency=medium
+
+  * New upstream release.
+  * Fix min version of virtualenv.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 07 Sep 2020 13:20:34 +0200
+
+python-pbr (5.4.5-3) unstable; urgency=medium
+
+  * Reactivate tests and docs.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 15 Apr 2020 09:31:18 +0200
+
+python-pbr (5.4.5-2) unstable; urgency=medium
+
+  * Uploading to experimental, fixing "cannot install" (Closes: #956736).
+  * Disabled unit tests for now, as otherwise it wouldn't build because test
+    dependencies need pbr to install. Will re-activate on next upload. Also
+    disabled docs because of the same reason (sphinxcontrib.apidoc needs PBR).
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 15 Apr 2020 09:11:52 +0200
+
+python-pbr (5.4.5-1) experimental; urgency=medium
+
+  * New upstream release.
+  * Removed remainings of Python 2 support.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 14 Apr 2020 21:19:22 +0200
+
+python-pbr (5.4.3-3) unstable; urgency=medium
+
+  * Drop python2 support; Closes: #938011
+
+ -- Sandro Tosi <morph@debian.org>  Tue, 14 Apr 2020 14:49:01 -0400
+
+python-pbr (5.4.3-2) unstable; urgency=medium
+
+  * Really re-introduce Python 2 support.
+
+ -- Thomas Goirand <zigo@debian.org>  Sat, 26 Oct 2019 15:42:55 +0200
+
+python-pbr (5.4.3-1) unstable; urgency=medium
+
+  [ Thomas Goirand ]
+  * New upstream release.
+  * Blacklist test_core.TestCore.test_setup_py_keywords().
+  * Re-introduce Python 2, as python-mock needs it, and we can't remove it
+    early.
+  * Add python3-sphinxcontrib.apidoc as build-depends.
+
+  [ Ondřej Nový ]
+  * Bump Standards-Version to 4.4.1.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 17 Sep 2019 16:51:52 +0200
+
+python-pbr (5.1.3-4) unstable; urgency=medium
+
+  * Team upload.
+  * Bump Standards-Version to 4.4.0.
+  * Fix autopkgtests (Closes: #934750).
+
+ -- Ondřej Nový <onovy@debian.org>  Wed, 14 Aug 2019 14:46:56 +0200
+
+python-pbr (5.1.3-3) unstable; urgency=medium
+
+  [ Ondřej Nový ]
+  * Running wrap-and-sort -bast.
+  * Use debhelper-compat instead of debian/compat.
+  * d/changelog: Remove trailing whitespaces.
+
+  [ Thomas Goirand ]
+  * Uploading to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 18 Jul 2019 23:48:47 +0200
+
+python-pbr (5.1.3-2) experimental; urgency=medium
+
+  * Removed management of alternatives.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 27 Mar 2019 12:39:40 +0100
+
+python-pbr (5.1.3-1) experimental; urgency=medium
+
+  * New upstream release.
+  * Removed Python 2 support.
+  * Removed now useless patches:
+    - fix-wheel.install.py-doesnt-exist-anymore.patch
+    - wheel_file.zipfile-is-moved-in-recent-wheel.patch
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 27 Mar 2019 12:32:00 +0100
+
 python-pbr (4.2.0-5) unstable; urgency=medium
 
   [ Mattia Rizzolo ]

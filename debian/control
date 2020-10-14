@@ -6,89 +6,36 @@ Uploaders:
  Thomas Goirand <zigo@debian.org>,
  Prach Pongpanich <prachpub@gmail.com>,
 Build-Depends:
- debhelper (>= 10),
+ debhelper-compat (= 10),
  dh-python,
  git,
  gnupg,
  openstack-pkg-tools,
- python-all,
- python-setuptools,
- python-sphinx,
  python3-all,
  python3-setuptools,
- python3-sphinx,
+ python3-sphinx <!nodoc>,
 Build-Depends-Indep:
- python-all-dev <!nocheck>,
- python-coverage <!nocheck>,
- python-fixtures <!nocheck>,
- python-markupsafe <!nocheck>,
- python-mock <!nocheck>,
- python-pip <!nocheck>,
- python-six <!nocheck>,
- python-stestr <!nocheck>,
- python-testresources (>= 2.0.0) <!nocheck>,
- python-testscenarios <!nocheck>,
- python-testtools (>= 2.2.0) <!nocheck>,
- python-virtualenv <!nocheck>,
- python-wheel <!nocheck>,
  python3-all-dev <!nocheck>,
+ python3-coverage <!nocheck>,
  python3-fixtures <!nocheck>,
  python3-markupsafe <!nocheck>,
  python3-mock <!nocheck>,
- python3-openstackdocstheme (>= 1.18.1) <!nocheck>,
+ python3-openstackdocstheme <!nocheck>,
  python3-pip <!nocheck>,
  python3-six <!nocheck>,
+ python3-sphinxcontrib.apidoc <!nodoc>,
  python3-stestr <!nocheck>,
- python3-testresources (>= 2.0.0) <!nocheck>,
+ python3-testresources <!nocheck>,
  python3-testscenarios <!nocheck>,
- python3-testtools (>= 2.2.0) <!nocheck>,
- python3-virtualenv <!nocheck>,
+ python3-testtools <!nocheck>,
+ python3-virtualenv (>= 20.0) <!nocheck>,
  python3-wheel <!nocheck>,
  subunit <!nocheck>,
- testrepository <!nocheck>,
-Standards-Version: 4.2.1
+Standards-Version: 4.4.1
 Rules-Requires-Root: no
 Vcs-Browser: https://salsa.debian.org/openstack-team/libs/python-pbr
 Vcs-Git: https://salsa.debian.org/openstack-team/libs/python-pbr.git
 Homepage: https://pypi.python.org/pypi/pbr
-
-Package: python-pbr
-Architecture: all
-Depends:
- python-pkg-resources,
- python-setuptools,
- python-six,
- ${misc:Depends},
- ${python:Depends},
-Recommends:
- ${python:Recommends},
-Description: inject useful and sensible default behaviors into setuptools - Python 2.x
- PBR (Python Build Reasonableness) is a library that injects some useful and
- sensible default behaviors into your setuptools run. PBR can:
-  * Manage version number based on git revisions and tags (Version file).
-  * Generate AUTHORS file from git log
-  * Generate ChangeLog from git log
-  * Generate Sphinx autodoc stub files for your whole module
-  * Store your dependencies in a pip requirements file
-  * Use your README file as a long_description
-  * Smartly find packages under your root package
- .
- PBR is only mildly configurable. The basic idea is that there's a decent way
- to run things and if you do, you should reap the rewards, because then it's
- simple and repeatable. If you want to do things differently, cool! But you've
- already got the power of Python at your fingertips, so you don't really need
- PBR.
- .
- PBR builds on top of the work that d2to1 started to provide for declarative
- configuration. d2to1 is itself an implementation of the ideas behind
- distutils2. Although distutils2 is now abandoned in favor of work towards PEP
- 426 and Metadata 2.0, declarative config is still a great idea and
- specifically important in trying to distribute setup code as a library when
- that library itself will alter how the setup is processed. As Metadata 2.0 and
- other modern Python packaging PEPs come out, PBR aims to support them as
- quickly as possible.
- .
- This package provides support for Python 2.x.
 
 Package: python-pbr-doc
 Section: doc
