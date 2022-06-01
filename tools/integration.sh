@@ -13,7 +13,7 @@ function mkvenv {
     venv=$1
 
     rm -rf $venv
-    virtualenv $venv
+    virtualenv -p python3 $venv
     $venv/bin/pip install $PIPFLAGS -U $PIPVERSION wheel requests
 
     # If a change to PBR is being tested, preinstall the wheel for it
@@ -22,15 +22,15 @@ function mkvenv {
     fi
 }
 
-# BASE should be a directory with a subdir called "new" and in that
+# BASE should be a directory with a subdir called "openstack" and in that
 #      dir, there should be a git repository for every entry in PROJECTS
-BASE=${BASE:-/opt/stack}
+BASE=${BASE:-/home/zuul/src/opendev.org/}
 
-REPODIR=${REPODIR:-$BASE/new}
+REPODIR=${REPODIR:-$BASE/openstack}
 
 # TODO: Figure out how to get this on to the box properly
 sudo apt-get update
-sudo apt-get install -y --force-yes libvirt-dev libxml2-dev libxslt-dev libmysqlclient-dev libpq-dev libnspr4-dev pkg-config libsqlite3-dev libzmq-dev libffi-dev libldap2-dev libsasl2-dev ccache libkrb5-dev liberasurecode-dev libjpeg-dev
+sudo apt-get install -y --force-yes libvirt-dev libxml2-dev libxslt-dev libmysqlclient-dev libpq-dev libnspr4-dev pkg-config libsqlite3-dev libffi-dev libldap2-dev libsasl2-dev ccache libkrb5-dev liberasurecode-dev libjpeg-dev libsystemd-dev libnss3-dev libssl-dev
 
 # FOR numpy / pyyaml
 # The source list has been removed from our apt config so rather than
@@ -97,10 +97,6 @@ name = test_project
 [entry_points]
 console_scripts =
     test_cmd = test_project:main
-
-[global]
-setup-hooks =
-    pbr.hooks.setup_hook
 EOF
 
 cat <<EOF > setup.py
@@ -115,18 +111,19 @@ from socket import error as SocketError
 try:
     setuptools.setup(
         setup_requires=['pbr'],
-        pbr=True)
+        pbr=True,
+    )
 except (SocketError, Timeout):
     setuptools.setup(
         setup_requires=['pbr'],
-        pbr=True)
-
+        pbr=True,
+    )
 EOF
 
 mkdir test_project
 cat <<EOF > test_project/__init__.py
 def main():
-    print "Test cmd"
+    print("Test cmd")
 EOF
 
 epvenv=$eptest/venv
@@ -163,8 +160,10 @@ export PBRVERSION
 export PROJECTS
 export REPODIR
 export WHEELHOUSE
-export OS_TEST_TIMEOUT=600
+export OS_TEST_TIMEOUT=900
 cd $REPODIR/pbr
-tox -epy27 --notest
-.tox/py27/bin/python -m pip install ${REPODIR}/requirements
-tox -epy27 -- test_integration
+mkvenv .venv
+source .venv/bin/activate
+pip install -r test-requirements.txt
+pip install ${REPODIR}/requirements
+stestr run --suppress-attachments test_integration
