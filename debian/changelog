@@ -1,3 +1,9 @@
+python-pbr (5.5.0-2pexip2) pexip-bullseye; urgency=medium
+
+  * Main bullseye build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Fri, 24 Jun 2022 14:04:30 +0100
+
 python-pbr (5.5.0-2pexip1) pexip; urgency=medium
 
   * Initial bullseye build
