@@ -1,3 +1,54 @@
+python-pbr (5.10.0-2) unstable; urgency=medium
+
+  * Uploading to unstable.
+  * Blacklist test_wsgi_script_install() (no such file or directory).
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 22 Sep 2022 16:53:18 +0200
+
+python-pbr (5.10.0-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 30 Aug 2022 11:51:55 +0200
+
+python-pbr (5.8.1-2) unstable; urgency=medium
+
+  * Uploading to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 24 Mar 2022 11:50:40 +0100
+
+python-pbr (5.8.1-1) experimental; urgency=medium
+
+  * New upstream release.
+  * Better clean target.
+  * Blacklist test_pep_517_support() (not interesting for Debian anyways).
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 15 Feb 2022 15:46:07 +0100
+
+python-pbr (5.6.0-2) unstable; urgency=medium
+
+  * Uploading to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 29 Sep 2021 11:31:22 +0200
+
+python-pbr (5.6.0-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 24 Aug 2021 10:12:54 +0200
+
+python-pbr (5.5.1-2) unstable; urgency=medium
+
+  * Upload to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 16 Aug 2021 10:34:44 +0200
+
+python-pbr (5.5.1-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 08 Mar 2021 11:32:39 +0100
+
 python-pbr (5.5.0-2) unstable; urgency=medium
 
   * Uploading to unstable.

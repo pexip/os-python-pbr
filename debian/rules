@@ -11,6 +11,7 @@ export https_proxy=127.0.0.1:9
 
 override_dh_auto_clean:
 	rm -rf .stestr build __pycache__
+	find . -type d -iname __pycache__ -exec rm -r {} \;
 
 override_dh_auto_build:
 	echo "Do nothing..."
@@ -20,7 +21,7 @@ override_dh_auto_install:
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	pkgos-dh_auto_test --no-py2 'pbr\.tests(?!.*test_packaging\.TestRequirementParsing\.test_requirement_parsing.*|.*test_core\.TestCore\.test_setup_py_keywords.*)'
+	pkgos-dh_auto_test --no-py2 'pbr\.tests(?!.*test_packaging\.TestRequirementParsing\.test_requirement_parsing.*|.*test_core\.TestCore\.test_setup_py_keywords.*|.*test_packaging\.TestPEP517Support\.test_pep_517_support.*|.*test_wsgi\.TestWsgiScripts\.test_wsgi_script_install.*)'
 endif
 
 override_dh_sphinxdoc:
