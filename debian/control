@@ -37,7 +37,7 @@ Rules-Requires-Root: no
 Vcs-Browser: https://salsa.debian.org/openstack-team/libs/python-pbr
 Vcs-Git: https://salsa.debian.org/openstack-team/libs/python-pbr.git
 Homepage: https://pypi.python.org/pypi/pbr
-XS-Pexip-Upstream: http://deb.debian.org/debian/ bullseye
+XS-Pexip-Upstream: http://deb.debian.org/debian/ bookworm
 
 Package: python-pbr-doc
 Section: doc
