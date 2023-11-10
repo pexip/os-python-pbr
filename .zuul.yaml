@@ -17,7 +17,6 @@
       - openstack/debtcollector
       - openstack/dib-utils
       - openstack/diskimage-builder
-      - openstack/django_openstack_auth
       - openstack/futurist
       - openstack/glance
       - openstack/glance_store
@@ -109,21 +108,37 @@
     templates:
       - lib-forward-testing
       - lib-forward-testing-python3
-      - openstack-cover-jobs
-      - openstack-lower-constraints-jobs
-      - openstack-python-jobs
-      - openstack-python3-ussuri-jobs
       - periodic-stable-jobs
       - publish-openstack-docs-pti
     check:
       jobs:
+        - openstack-tox-pep8
+        - openstack-tox-cover
+        - openstack-tox-py27
+        - openstack-tox-py36
+        - openstack-tox-py37
+        - openstack-tox-py38
+        - openstack-tox-py39
         - pbr-installation-openstack
         - pbr-installation-openstack-pip-dev
+        - tempest-full:
+            override-checkout: stable/train
     gate:
       jobs:
+        - openstack-tox-pep8
+        - openstack-tox-cover
+        - openstack-tox-py27
+        - openstack-tox-py36
+        - openstack-tox-py37
+        - openstack-tox-py38
+        - openstack-tox-py39
         - pbr-installation-openstack
         - pbr-installation-openstack-pip-dev
+        - tempest-full:
+            override-checkout: stable/train
     periodic:
       jobs:
         - pbr-installation-openstack
         - pbr-installation-openstack-pip-dev
+        - tempest-full:
+            override-checkout: stable/train
